@@ -1,0 +1,4 @@
+size_label,size_bytes,kem_encap_ms,aes_enc_ms,total_wrap_ms,kem_decap_ms,aes_dec_ms,total_unwrap_ms,wrap_min_ms,wrap_max_ms,unwrap_min_ms,unwrap_max_ms
+100 KB,102400,0.720,2.681,3.416,0.678,2.368,3.049,1.565,9.263,1.646,8.002
+500 KB,524288,0.364,5.545,5.936,0.383,5.593,5.979,5.620,6.378,5.538,6.542
+2 MB,2097152,0.316,21.330,21.755,0.394,21.443,21.839,21.384,22.427,21.361,22.338
