@@ -1,8 +1,17 @@
 # Signal-PQC-Integration
 
+![ML-KEM-768](https://img.shields.io/badge/KEM-ML--KEM--768-blueviolet)
+![FIPS 203](https://img.shields.io/badge/NIST-FIPS_203-blue)
+![AES-256-GCM](https://img.shields.io/badge/AEAD-AES--256--GCM-informational)
+![Signal Desktop](https://img.shields.io/badge/Signal_Desktop-v7.81.0-3a76f0)
+![TypeScript](https://img.shields.io/badge/TypeScript-no_native_bindings-3178c6)
+![License](https://img.shields.io/badge/license-GPL--3.0-green)
+
 A post-quantum encryption layer for Signal Desktop, built as part of my Final Year Project at the University of Nicosia. This adds ML-KEM-768 (CRYSTALS-Kyber) on top of Signal's existing Double Ratchet protocol, giving messages a hybrid classical+PQ encryption stack.
 
 The idea is simple: encrypt the plaintext with ML-KEM-768 + AES-256-GCM *before* it hits the Signal protocol layer. Signal then does its usual thing on top. Neither layer replaces the other — you get both.
+
+> **Full source:** the complete modified Signal Desktop tree lives on the [`fyp-signal-7.81.0` branch of my fork](https://github.com/Somthin2/Signal-Desktop/tree/fyp-signal-7.81.0). This repo is the distilled version — just the changed files, the benchmarks, and the results.
 
 ---
 
@@ -27,12 +36,21 @@ Signal-PQC-Integration/
 │   ├── attachment_benchmark.csv
 │   └── stress_test.jsonl
 └── docs/
-    └── EXPERIMENT_METHODOLOGY.md
+    ├── EXPERIMENT_METHODOLOGY.md
+    └── images/              # Benchmark figures (as used in the paper/thesis)
 ```
 
 ---
 
 ## Key results
+
+### In-app message sending
+
+Measured across live message sends between two local Signal Desktop instances, the full sender-side overhead (protobuf encode + PQ wrap + padding + Signal encrypt) averages 14.2 ms with PQ enabled versus 2.5 ms without — an added cost of about 12 ms, far below the ~100 ms threshold users perceive as instantaneous.
+
+![Total sender-side overhead per message, PQ vs plain](docs/images/sender_overhead.png)
+
+### Attachment encryption
 
 Tested on Apple M4 Pro (24 GB RAM, macOS), n=18 runs per payload size:
 
@@ -44,7 +62,17 @@ Tested on Apple M4 Pro (24 GB RAM, macOS), n=18 runs per payload size:
 
 The KEM (ML-KEM-768 encapsulate/decapsulate) cost is nearly constant regardless of payload size — around 0.3–0.7 ms. The dominant cost at larger sizes is the AES-256-GCM symmetric encryption, which scales linearly with data. For text messages the total PQ overhead is well under 5 ms.
 
-Stress testing (`pq-stress-test.mjs`, 60-byte messages):
+![Encryption and decryption latency across attachment sizes](docs/images/attachment_latency.png)
+
+The interesting inversion: for text messages the KEM dominates the cost, while for attachments it's a rounding error next to the AES bulk encryption.
+
+| | |
+|---|---|
+| ![PQ cost breakdown: ML-KEM-768 vs AES-256-GCM](docs/images/cost_breakdown.png) | ![PQ overhead: text messages vs image attachments](docs/images/text_vs_image.png) |
+
+### Stress testing
+
+`pq-stress-test.mjs`, 60-byte messages:
 
 | Phase | Throughput | Wrap avg | Wrap p99 |
 |-------|-----------|----------|----------|
@@ -52,6 +80,16 @@ Stress testing (`pq-stress-test.mjs`, 60-byte messages):
 | Sustained (10 msg/s × 60 s)  | steady 9.9 msg/s | 2.13 ms | 5.78 ms |
 
 No latency degradation or memory growth over sustained operation (RSS stable at ~60 MB, CPU under 8%). Raw per-message data is in `results/stress_test.jsonl`.
+
+![Burst stress test: per-message wrap/unwrap latency across 1,000 consecutive messages](docs/images/stress_burst.png)
+
+![Stress test summary: throughput, p99 wrap latency, and peak memory](docs/images/stress_summary.png)
+
+### Resource usage
+
+Running with the PQ layer enabled costs little beyond the crypto itself — CPU and memory stay close to the plain-Signal baseline during a 60-second messaging window:
+
+![Resource consumption: plain Signal vs PQ-enabled Signal](docs/images/resource_usage.png)
 
 ---
 
