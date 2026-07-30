@@ -20,7 +20,7 @@ The M4 Pro has hardware AES acceleration via ARM Cryptography Extensions, which 
 
 ## What was measured
 
-There are two distinct sets of measurements:
+There are three distinct sets of measurements:
 
 ### 1. Standalone attachment benchmark (`pq-bench-attachments.mjs`)
 
@@ -49,6 +49,19 @@ Stages logged:
 - `PQ_RECV` — KEM decap + AES decrypt, inside `unwrapIncoming()`
 - `SEND_PREP` — total plaintext preparation (proto encode + PQ wrap + padding)
 - `SIGNAL_SEND` — time for `signalEncrypt()` to run after plaintext is ready
+
+### 3. Stress test (`pq-stress-test.mjs`)
+
+Like the attachment benchmark, this runs the crypto code standalone (same `ml_kem768` and `gcm` calls as `PQWrapper.ts`), but under load rather than at controlled sizes. Message size is fixed at 60 bytes — a typical protobuf-encoded text message.
+
+Three phases:
+- **Burst** — 1,000 messages wrapped and unwrapped as fast as possible
+- **Sustained** — steady 10 msg/s for 60 seconds
+- **Combined** — burst immediately followed by sustained, to check for degradation after load
+
+Each message logs wrap/unwrap latency broken into KEM and AES components; CPU usage and memory RSS are sampled at 1-second intervals during the sustained phases.
+
+Headline results (raw data in `results/stress_test.jsonl`): burst throughput of 1,295 msg/s with 0.35 ms average wrap latency (p99 0.50 ms); sustained operation held a steady 9.9 msg/s with no latency growth, memory flat at ~60 MB RSS, and CPU below 8%. The combined phase showed no degradation relative to the isolated phases.
 
 ---
 

@@ -19,10 +19,13 @@ Signal-PQC-Integration/
 │   └── pqBenchmarkLogger.ts         # JSONL benchmark logging
 ├── scripts/
 │   ├── pq-bench-attachments.mjs     # Standalone attachment benchmark
+│   ├── pq-stress-test.mjs           # Burst/sustained-load stress test
 │   ├── create-test-images.sh        # Generate test PNG files at target sizes
-│   └── analyze-pq-bench.py          # Parse logs and produce summary tables
+│   ├── analyze-pq-bench.py          # Parse logs and produce summary tables
+│   └── plot-stress-test.py          # Plot stress test results
 ├── results/                 # Benchmark output graphs and CSV data
-│   └── attachment_benchmark.csv
+│   ├── attachment_benchmark.csv
+│   └── stress_test.jsonl
 └── docs/
     └── EXPERIMENT_METHODOLOGY.md
 ```
@@ -40,6 +43,15 @@ Tested on Apple M4 Pro (24 GB RAM, macOS), n=18 runs per payload size:
 | 2 MB    | 21.76 ms     | 21.84 ms        | ~0.32 ms     |
 
 The KEM (ML-KEM-768 encapsulate/decapsulate) cost is nearly constant regardless of payload size — around 0.3–0.7 ms. The dominant cost at larger sizes is the AES-256-GCM symmetric encryption, which scales linearly with data. For text messages the total PQ overhead is well under 5 ms.
+
+Stress testing (`pq-stress-test.mjs`, 60-byte messages):
+
+| Phase | Throughput | Wrap avg | Wrap p99 |
+|-------|-----------|----------|----------|
+| Burst (1,000 msgs, max rate) | 1,295 msg/s | 0.35 ms | 0.50 ms |
+| Sustained (10 msg/s × 60 s)  | steady 9.9 msg/s | 2.13 ms | 5.78 ms |
+
+No latency degradation or memory growth over sustained operation (RSS stable at ~60 MB, CPU under 8%). Raw per-message data is in `results/stress_test.jsonl`.
 
 ---
 
@@ -76,6 +88,19 @@ node scripts/pq-bench-attachments.mjs --runs 18 --sizes 102400,524288,2097152
 ```
 
 Results go to `~/SignalPQBenchmarks/`.
+
+### Running the stress test
+
+Also standalone — three phases: burst (1,000 messages at max rate), sustained (10 msg/s for 60 s), and combined:
+
+```bash
+cd Signal-Desktop
+node scripts/pq-stress-test.mjs
+# or with custom parameters:
+node scripts/pq-stress-test.mjs --burst-n 500 --sustained-rate 5 --sustained-secs 30
+```
+
+Output is a JSONL log in `~/SignalPQBenchmarks/` with per-message wrap/unwrap latency plus CPU and memory samples; `scripts/plot-stress-test.py` turns it into graphs.
 
 ### Toggling PQ on/off
 
